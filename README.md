@@ -1,6 +1,6 @@
 # 时间线 Timeline · 历史时间线设计器
 
-一个参考 [time.graphics](https://time.graphics/) 的时间线设计工具，纯静态 Web 应用（无构建、无依赖），双击 `index.html` 即可在浏览器打开使用。
+一个参考简单的时间线设计工具，纯静态 Web 应用，双击 `index.html` 即可在浏览器打开使用。
 
 ## 快速开始
 
