@@ -8,10 +8,10 @@
   var FONT = '-apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, Arial, sans-serif';
 
   var MARGIN = 60;        // 左右留白（CSS px）
-  var AXIS_RATIO = 0.55;  // 轴线纵向位置（中间偏下）
 
   R.view = { t0: -3500, t1: 2040 };
   R.refSpan = 5540;
+  R.axisRatio = 0.55;     // 轴线纵向位置（可调，默认中间偏下）
   R.selection = { type: null, id: null };
   R.hits = [];
   R.metrics = null;
@@ -103,7 +103,7 @@
     var t0 = R.view.t0, t1 = R.view.t1;
     if (t1 <= t0) return;
     var ppy = plotW / (t1 - t0);
-    var axisY = Math.round(h * AXIS_RATIO);
+    var axisY = Math.round(h * R.axisRatio);
 
     R.metrics = { m: m, plotW: plotW, t0: t0, t1: t1, ppy: ppy, axisY: axisY, w: w, h: h };
     R.hits = [];
@@ -332,6 +332,11 @@
     R.view.t0 = b.lo - pad;
     R.view.t1 = b.hi + pad;
     R.refSpan = R.view.t1 - R.view.t0;
+  };
+
+  R.setAxisRatio = function (ratio) {
+    R.axisRatio = Math.max(0.1, Math.min(0.9, ratio));
+    R.draw();
   };
 
   R.zoomBy = function (factor, cx) {

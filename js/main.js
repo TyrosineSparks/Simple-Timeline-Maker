@@ -10,6 +10,12 @@
   TL.interaction.init(canvas);
   TL.ui.init();
 
+  // 恢复时间轴（轴线）位置设置
+  try {
+    var savedAxis = parseFloat(localStorage.getItem('timeline-axis'));
+    if (isFinite(savedAxis) && savedAxis > 0 && savedAxis < 1) TL.render.axisRatio = savedAxis;
+  } catch (e) { /* ignore */ }
+
   function resize() {
     var r = wrap.getBoundingClientRect();
     if (r.width > 0 && r.height > 0) TL.render.resize(r.width, r.height, window.devicePixelRatio || 1);

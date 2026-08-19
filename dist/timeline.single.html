@@ -87,6 +87,8 @@ html, body {
 .btn-sm { height: 26px; padding: 0 8px; font-size: 12px; }
 .icon-btn { width: 32px; padding: 0; font-size: 15px; }
 .zoom-label { font-size: 12px; color: var(--text-dim); min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
+.axis-label { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+.axis-slider { width: 110px; accent-color: var(--accent); cursor: pointer; }
 
 /* ---------- Layout ---------- */
 .app { display: flex; height: calc(100vh - 52px); }
@@ -208,6 +210,11 @@ html, body {
       <span id="zoom-label" class="zoom-label">100%</span>
       <button id="btn-zoom-in" class="btn icon-btn" title="放大">＋</button>
       <button id="btn-fit" class="btn" title="缩放到全部内容">适配</button>
+    </div>
+
+    <div class="tb-group axis-group" title="拖动调整时间轴（轴线）的上下位置">
+      <span class="axis-label">轴线</span>
+      <input type="range" id="axis-slider" class="axis-slider" min="15" max="85" value="55">
     </div>
 
     <div class="spacer"></div>
@@ -720,10 +727,10 @@ html, body {
   var FONT = '-apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, Arial, sans-serif';
 
   var MARGIN = 60;        // 左右留白（CSS px）
-  var AXIS_RATIO = 0.55;  // 轴线纵向位置（中间偏下）
 
   R.view = { t0: -3500, t1: 2040 };
   R.refSpan = 5540;
+  R.axisRatio = 0.55;     // 轴线纵向位置（可调，默认中间偏下）
   R.selection = { type: null, id: null };
   R.hits = [];
   R.metrics = null;
@@ -815,7 +822,7 @@ html, body {
     var t0 = R.view.t0, t1 = R.view.t1;
     if (t1 <= t0) return;
     var ppy = plotW / (t1 - t0);
-    var axisY = Math.round(h * AXIS_RATIO);
+    var axisY = Math.round(h * R.axisRatio);
 
     R.metrics = { m: m, plotW: plotW, t0: t0, t1: t1, ppy: ppy, axisY: axisY, w: w, h: h };
     R.hits = [];
@@ -1046,6 +1053,11 @@ html, body {
     R.refSpan = R.view.t1 - R.view.t0;
   };
 
+  R.setAxisRatio = function (ratio) {
+    R.axisRatio = Math.max(0.1, Math.min(0.9, ratio));
+    R.draw();
+  };
+
   R.zoomBy = function (factor, cx) {
     var m = R.metrics;
     if (!m) return;
@@ -1261,6 +1273,11 @@ html, body {
     $('btn-zoom-out').addEventListener('click', function () { TL.render.zoomBy(1 / 1.4, TL.render.w / 2); UI.refresh(true); });
     $('btn-zoom-in').addEventListener('click', function () { TL.render.zoomBy(1.4, TL.render.w / 2); UI.refresh(true); });
     $('btn-fit').addEventListener('click', function () { TL.render.fit(); UI.refresh(true); });
+    $('axis-slider').addEventListener('input', function () {
+      var ratio = this.value / 100;
+      TL.render.setAxisRatio(ratio);
+      try { localStorage.setItem('timeline-axis', String(ratio)); } catch (e) {}
+    });
     $('btn-sample').addEventListener('click', function () { TL.model.setState(TL.sample()); UI.select(null, null); TL.render.fit(); UI.refresh(); });
     $('btn-clear').addEventListener('click', function () {
       if (confirm('确定清空当前时间线的全部内容？')) { TL.model.reset(); UI.select(null, null); TL.render.fit(); UI.refresh(); }
@@ -1313,6 +1330,7 @@ html, body {
     TL.render.draw();
     UI.updateZoomLabel();
     UI.updateUndoButtons();
+    UI.updateAxisSlider();
     if (light) return;
     UI.rebuildList();
     UI.rebuildCategories();
@@ -1322,6 +1340,10 @@ html, body {
   };
 
   UI.updateZoomLabel = function () { $('zoom-label').textContent = TL.render.zoomLabel(); };
+  UI.updateAxisSlider = function () {
+    var s = $('axis-slider');
+    if (s) s.value = Math.round(TL.render.axisRatio * 100);
+  };
   UI.updateUndoButtons = function () {
     $('btn-undo').disabled = !TL.model.canUndo();
     $('btn-redo').disabled = !TL.model.canRedo();
@@ -1794,6 +1816,12 @@ html, body {
   TL.render.onImageLoad = function () { TL.render.draw(); };
   TL.interaction.init(canvas);
   TL.ui.init();
+
+  // 恢复时间轴（轴线）位置设置
+  try {
+    var savedAxis = parseFloat(localStorage.getItem('timeline-axis'));
+    if (isFinite(savedAxis) && savedAxis > 0 && savedAxis < 1) TL.render.axisRatio = savedAxis;
+  } catch (e) { /* ignore */ }
 
   function resize() {
     var r = wrap.getBoundingClientRect();

@@ -25,6 +25,11 @@
     $('btn-zoom-out').addEventListener('click', function () { TL.render.zoomBy(1 / 1.4, TL.render.w / 2); UI.refresh(true); });
     $('btn-zoom-in').addEventListener('click', function () { TL.render.zoomBy(1.4, TL.render.w / 2); UI.refresh(true); });
     $('btn-fit').addEventListener('click', function () { TL.render.fit(); UI.refresh(true); });
+    $('axis-slider').addEventListener('input', function () {
+      var ratio = this.value / 100;
+      TL.render.setAxisRatio(ratio);
+      try { localStorage.setItem('timeline-axis', String(ratio)); } catch (e) {}
+    });
     $('btn-sample').addEventListener('click', function () { TL.model.setState(TL.sample()); UI.select(null, null); TL.render.fit(); UI.refresh(); });
     $('btn-clear').addEventListener('click', function () {
       if (confirm('确定清空当前时间线的全部内容？')) { TL.model.reset(); UI.select(null, null); TL.render.fit(); UI.refresh(); }
@@ -77,6 +82,7 @@
     TL.render.draw();
     UI.updateZoomLabel();
     UI.updateUndoButtons();
+    UI.updateAxisSlider();
     if (light) return;
     UI.rebuildList();
     UI.rebuildCategories();
@@ -86,6 +92,10 @@
   };
 
   UI.updateZoomLabel = function () { $('zoom-label').textContent = TL.render.zoomLabel(); };
+  UI.updateAxisSlider = function () {
+    var s = $('axis-slider');
+    if (s) s.value = Math.round(TL.render.axisRatio * 100);
+  };
   UI.updateUndoButtons = function () {
     $('btn-undo').disabled = !TL.model.canUndo();
     $('btn-redo').disabled = !TL.model.canRedo();
