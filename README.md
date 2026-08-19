@@ -4,8 +4,10 @@
 
 ## 快速开始
 
-- **直接打开**：双击 `index.html`（或拖入浏览器）。
+- **网页**：https://tyrosinesparks.github.io/Simple-Timeline-Maker/
+- **本地直接打开**：双击 `index.html`（或拖入浏览器）。
 - **本地服务（可选，图片跨域等场景推荐）**：
+  
   ```bash
   # 任选其一
   python -m http.server 8080
