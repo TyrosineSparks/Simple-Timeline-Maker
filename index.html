@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时间线 Timeline · 历史时间线设计器</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand">
+      <span class="logo">⟳</span>
+      <span class="brand-name">时间线</span>
+    </div>
+
+    <input id="tl-title" class="tl-title-input" type="text" value="我的时间线" title="时间线标题" spellcheck="false">
+
+    <div class="tb-group">
+      <button id="btn-add-event" class="btn btn-primary" title="添加单个事件">＋ 事件</button>
+      <button id="btn-add-period" class="btn" title="添加时段（有起止日期）">＋ 时段</button>
+      <button id="btn-add-era" class="btn" title="添加纪元（背景色带）">＋ 纪元</button>
+    </div>
+
+    <div class="tb-group">
+      <button id="btn-undo" class="btn icon-btn" title="撤销 (Ctrl+Z)">↶</button>
+      <button id="btn-redo" class="btn icon-btn" title="重做 (Ctrl+Shift+Z)">↷</button>
+    </div>
+
+    <div class="tb-group">
+      <button id="btn-zoom-out" class="btn icon-btn" title="缩小">−</button>
+      <span id="zoom-label" class="zoom-label">100%</span>
+      <button id="btn-zoom-in" class="btn icon-btn" title="放大">＋</button>
+      <button id="btn-fit" class="btn" title="缩放到全部内容">适配</button>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="tb-group">
+      <button id="btn-png" class="btn" title="导出 PNG 图片">导出 PNG</button>
+      <button id="btn-save-json" class="btn" title="保存为项目文件">保存</button>
+      <button id="btn-load-json" class="btn" title="打开项目文件">打开</button>
+      <button id="btn-print" class="btn" title="打印 / 导出 PDF">打印</button>
+      <input type="file" id="file-json" accept=".json,application/json" hidden>
+    </div>
+
+    <div class="tb-group">
+      <button id="btn-sample" class="btn" title="载入示例时间线">示例</button>
+      <button id="btn-clear" class="btn btn-danger" title="清空全部">清空</button>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside class="sidebar left">
+      <div class="panel">
+        <div class="panel-head">浏览</div>
+        <input id="search" class="input" type="text" placeholder="搜索标题 / 描述…">
+        <select id="cat-filter" class="input">
+          <option value="">全部类别</option>
+        </select>
+        <div class="list-scroll" id="list-scroll">
+          <div class="list-section" data-section="eras">
+            <div class="list-section-title">纪元</div>
+            <div id="era-list" class="list-body"></div>
+          </div>
+          <div class="list-section" data-section="periods">
+            <div class="list-section-title">时段</div>
+            <div id="period-list" class="list-body"></div>
+          </div>
+          <div class="list-section" data-section="events">
+            <div class="list-section-title">事件</div>
+            <div id="event-list" class="list-body"></div>
+          </div>
+        </div>
+        <div class="counts" id="counts"></div>
+      </div>
+    </aside>
+
+    <main class="canvas-wrap" id="canvas-wrap">
+      <canvas id="tl"></canvas>
+      <div class="canvas-hint" id="canvas-hint">
+        <span>滚轮缩放 · 拖拽空白平移 · 拖动节点改日期 · 拖动时段两端调整范围 · 双击适配</span>
+      </div>
+    </main>
+
+    <aside class="sidebar right">
+      <div class="panel">
+        <div class="panel-head">类别</div>
+        <div id="cat-list" class="cat-list"></div>
+        <div class="cat-add-row">
+          <input id="new-cat-name" class="input input-sm" type="text" placeholder="新类别">
+          <input id="new-cat-color" class="color-input" type="color" value="#2f6fed">
+          <button id="btn-add-cat" class="btn btn-sm" title="添加类别">＋</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head" id="editor-head">属性</div>
+        <div class="editor-body">
+          <input type="hidden" id="f-mode" value="">
+          <input type="hidden" id="f-type" value="event">
+          <input type="hidden" id="f-id" value="">
+
+          <label class="field-label" id="lbl-title">标题</label>
+          <input id="f-title" class="input" type="text" placeholder="标题">
+
+          <div id="row-period-toggle" class="check-row">
+            <label><input type="checkbox" id="f-period-toggle"> 这是时段（有起止日期）</label>
+          </div>
+
+          <label class="field-label" id="lbl-date">日期</label>
+          <input id="f-date" class="input" type="text" placeholder="例如 1945 / 1945-08-06 / 300 BCE">
+          <div class="date-help" id="date-help">支持：年份、年-月、年-月-日、BCE/BC（公元前）</div>
+
+          <div id="row-enddate" class="field-row" style="display:none">
+            <label class="field-label">结束日期</label>
+            <input id="f-enddate" class="input" type="text" placeholder="结束日期">
+          </div>
+
+          <div id="row-category" class="field-row">
+            <label class="field-label">类别</label>
+            <select id="f-category" class="input"></select>
+          </div>
+
+          <div id="row-color" class="field-row" style="display:none">
+            <label class="field-label">颜色</label>
+            <input id="f-color" class="color-input wide" type="color" value="#2f6fed">
+          </div>
+
+          <div id="row-image" class="field-row" style="display:none">
+            <label class="field-label">图片</label>
+            <input id="f-image" class="input" type="text" placeholder="图片 URL（可选）">
+            <div class="img-row">
+              <button id="btn-pick-image" class="btn btn-sm">选择文件</button>
+              <label class="check-row inline"><input type="checkbox" id="f-show-image" checked> 显示在时间线上</label>
+            </div>
+            <img id="f-image-preview" class="img-preview" alt="" style="display:none">
+            <input type="file" id="f-image-file" accept="image/*" hidden>
+          </div>
+
+          <div id="row-link" class="field-row" style="display:none">
+            <label class="field-label">链接</label>
+            <input id="f-link" class="input" type="text" placeholder="https://…（可选）">
+          </div>
+
+          <div id="row-desc" class="field-row" style="display:none">
+            <label class="field-label">描述</label>
+            <textarea id="f-desc" class="input textarea" rows="4" placeholder="描述、备注…"></textarea>
+          </div>
+
+          <div class="editor-actions">
+            <button id="btn-save" class="btn btn-primary">保存</button>
+            <button id="btn-delete" class="btn btn-danger" style="display:none">删除</button>
+            <button id="btn-cancel" class="btn">取消</button>
+          </div>
+          <div id="editor-error" class="editor-error" style="display:none"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="js/dateutil.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/sample.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/interaction.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,1858 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时间线 Timeline · 历史时间线设计器</title>
+<style>
+:root {
+  --accent: #2f6fed;
+  --accent-dark: #1f56c8;
+  --accent-soft: #e8f0fe;
+  --bg: #f4f6fa;
+  --panel: #ffffff;
+  --line: #e3e8ef;
+  --text: #1f2937;
+  --text-dim: #6b7280;
+  --text-faint: #9aa3b2;
+  --danger: #e5484d;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(16, 24, 40, .08), 0 1px 2px rgba(16, 24, 40, .04);
+  --font: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+  font-size: 14px;
+  overflow: hidden;
+}
+
+/* ---------- Toolbar ---------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  flex: none;
+  z-index: 10;
+}
+.brand { display: flex; align-items: center; gap: 7px; flex: none; }
+.logo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 7px;
+  background: linear-gradient(135deg, #3b82f6, #2f6fed);
+  color: #fff; font-weight: 700; font-size: 16px;
+}
+.brand-name { font-weight: 700; font-size: 15px; }
+.tl-title-input {
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 15px; font-weight: 600;
+  padding: 6px 8px; border-radius: 6px;
+  width: 220px; color: var(--text);
+  transition: border .12s, background .12s;
+}
+.tl-title-input:hover { background: #f0f3f8; }
+.tl-title-input:focus { outline: none; border-color: var(--accent); background: #fff; }
+
+.tb-group { display: flex; align-items: center; gap: 6px; }
+.spacer { flex: 1 1 auto; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 5px; height: 32px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: #fff; color: var(--text);
+  font-size: 13px; font-family: inherit; cursor: pointer;
+  transition: background .12s, border .12s, transform .05s;
+  white-space: nowrap;
+}
+.btn:hover { background: #f3f6fb; border-color: #cdd6e2; }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+.btn-danger { color: var(--danger); }
+.btn-danger:hover { background: #fdf0f0; border-color: #f3c6c7; }
+.btn-sm { height: 26px; padding: 0 8px; font-size: 12px; }
+.icon-btn { width: 32px; padding: 0; font-size: 15px; }
+.zoom-label { font-size: 12px; color: var(--text-dim); min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* ---------- Layout ---------- */
+.app { display: flex; height: calc(100vh - 52px); }
+.sidebar { flex: none; background: var(--panel); overflow: hidden; }
+.sidebar.left { width: 260px; border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.sidebar.right { width: 300px; border-left: 1px solid var(--line); overflow-y: auto; }
+.canvas-wrap { position: relative; flex: 1 1 auto; min-width: 0; background: #fff; }
+#tl { display: block; width: 100%; height: 100%; cursor: grab; }
+#tl.panning { cursor: grabbing; }
+
+.canvas-hint {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  background: rgba(17, 24, 39, .72); color: #e6e9ef;
+  font-size: 12px; padding: 6px 12px; border-radius: 20px;
+  pointer-events: none; white-space: nowrap; max-width: 90%;
+  overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; transition: opacity .3s;
+}
+.canvas-wrap:hover .canvas-hint { opacity: 1; }
+
+/* ---------- Panels ---------- */
+.panel { padding: 12px; border-bottom: 1px solid var(--line); }
+.panel:last-child { border-bottom: none; }
+.panel-head { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); margin-bottom: 10px; }
+
+.input {
+  width: 100%; padding: 7px 9px;
+  border: 1px solid var(--line); border-radius: 6px;
+  font-size: 13px; font-family: inherit; color: var(--text);
+  background: #fff; outline: none;
+  transition: border .12s, box-shadow .12s;
+}
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47, 111, 237, .13); }
+.input-sm { width: auto; flex: 1 1 auto; min-width: 0; }
+.textarea { resize: vertical; min-height: 60px; line-height: 1.5; }
+
+/* left list */
+.list-scroll { overflow-y: auto; margin: 10px -4px 0 0; padding-right: 4px; flex: 1 1 auto; min-height: 0; }
+.sidebar.left .panel { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.sidebar.left .panel .input { margin-bottom: 8px; }
+.list-section-title { font-size: 11px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 5px; }
+.list-body { display: flex; flex-direction: column; gap: 3px; }
+.item {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 8px; border-radius: 6px; cursor: pointer;
+  border: 1px solid transparent; transition: background .1s, border .1s;
+}
+.item:hover { background: #f3f6fb; }
+.item.active { background: var(--accent-soft); border-color: rgba(47,111,237,.35); }
+.item .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.item .bar { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.item .t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.item .d { font-size: 11px; color: var(--text-faint); flex: none; }
+.item .thumb { width: 26px; height: 20px; border-radius: 3px; object-fit: cover; flex: none; }
+.counts { font-size: 12px; color: var(--text-faint); padding: 8px 2px 0; border-top: 1px solid var(--line); margin-top: 8px; }
+
+/* categories */
+.cat-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.cat-item { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.cat-item .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,.1); }
+.cat-item .n { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-item .x { cursor: pointer; color: var(--text-faint); border: none; background: none; font-size: 14px; }
+.cat-item .x:hover { color: var(--danger); }
+.cat-add-row { display: flex; align-items: center; gap: 6px; }
+.color-input { width: 30px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; flex: none; }
+.color-input.wide { width: 46px; }
+
+/* editor */
+.editor-body { display: flex; flex-direction: column; gap: 8px; }
+.field-label { font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: -4px; }
+.field-row { display: flex; flex-direction: column; gap: 5px; }
+.check-row { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.check-row.inline { margin: 0; }
+.check-row input { margin: 0; }
+.date-help { font-size: 11px; color: var(--text-faint); line-height: 1.4; }
+.img-row { display: flex; align-items: center; gap: 8px; }
+.img-preview { width: 100%; max-height: 120px; object-fit: contain; border-radius: 6px; border: 1px solid var(--line); margin-top: 4px; background: #f7f9fc; }
+.editor-actions { display: flex; gap: 8px; margin-top: 4px; }
+.editor-actions .btn-primary { flex: 1; }
+.editor-error { color: var(--danger); font-size: 12px; padding: 6px 8px; background: #fdf0f0; border-radius: 6px; }
+
+/* scrollbars */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: #cdd5e0; border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #aab6c6; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+@media (max-width: 1100px) {
+  .sidebar.right { width: 260px; }
+  .sidebar.left { width: 230px; }
+  .brand-name { display: none; }
+  .tl-title-input { width: 140px; }
+}
+
+</style>
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand">
+      <span class="logo">⟳</span>
+      <span class="brand-name">时间线</span>
+    </div>
+
+    <input id="tl-title" class="tl-title-input" type="text" value="我的时间线" title="时间线标题" spellcheck="false">
+
+    <div class="tb-group">
+      <button id="btn-add-event" class="btn btn-primary" title="添加单个事件">＋ 事件</button>
+      <button id="btn-add-period" class="btn" title="添加时段（有起止日期）">＋ 时段</button>
+      <button id="btn-add-era" class="btn" title="添加纪元（背景色带）">＋ 纪元</button>
+    </div>
+
+    <div class="tb-group">
+      <button id="btn-undo" class="btn icon-btn" title="撤销 (Ctrl+Z)">↶</button>
+      <button id="btn-redo" class="btn icon-btn" title="重做 (Ctrl+Shift+Z)">↷</button>
+    </div>
+
+    <div class="tb-group">
+      <button id="btn-zoom-out" class="btn icon-btn" title="缩小">−</button>
+      <span id="zoom-label" class="zoom-label">100%</span>
+      <button id="btn-zoom-in" class="btn icon-btn" title="放大">＋</button>
+      <button id="btn-fit" class="btn" title="缩放到全部内容">适配</button>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="tb-group">
+      <button id="btn-png" class="btn" title="导出 PNG 图片">导出 PNG</button>
+      <button id="btn-save-json" class="btn" title="保存为项目文件">保存</button>
+      <button id="btn-load-json" class="btn" title="打开项目文件">打开</button>
+      <button id="btn-print" class="btn" title="打印 / 导出 PDF">打印</button>
+      <input type="file" id="file-json" accept=".json,application/json" hidden>
+    </div>
+
+    <div class="tb-group">
+      <button id="btn-sample" class="btn" title="载入示例时间线">示例</button>
+      <button id="btn-clear" class="btn btn-danger" title="清空全部">清空</button>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside class="sidebar left">
+      <div class="panel">
+        <div class="panel-head">浏览</div>
+        <input id="search" class="input" type="text" placeholder="搜索标题 / 描述…">
+        <select id="cat-filter" class="input">
+          <option value="">全部类别</option>
+        </select>
+        <div class="list-scroll" id="list-scroll">
+          <div class="list-section" data-section="eras">
+            <div class="list-section-title">纪元</div>
+            <div id="era-list" class="list-body"></div>
+          </div>
+          <div class="list-section" data-section="periods">
+            <div class="list-section-title">时段</div>
+            <div id="period-list" class="list-body"></div>
+          </div>
+          <div class="list-section" data-section="events">
+            <div class="list-section-title">事件</div>
+            <div id="event-list" class="list-body"></div>
+          </div>
+        </div>
+        <div class="counts" id="counts"></div>
+      </div>
+    </aside>
+
+    <main class="canvas-wrap" id="canvas-wrap">
+      <canvas id="tl"></canvas>
+      <div class="canvas-hint" id="canvas-hint">
+        <span>滚轮缩放 · 拖拽空白平移 · 拖动节点改日期 · 拖动时段两端调整范围 · 双击适配</span>
+      </div>
+    </main>
+
+    <aside class="sidebar right">
+      <div class="panel">
+        <div class="panel-head">类别</div>
+        <div id="cat-list" class="cat-list"></div>
+        <div class="cat-add-row">
+          <input id="new-cat-name" class="input input-sm" type="text" placeholder="新类别">
+          <input id="new-cat-color" class="color-input" type="color" value="#2f6fed">
+          <button id="btn-add-cat" class="btn btn-sm" title="添加类别">＋</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head" id="editor-head">属性</div>
+        <div class="editor-body">
+          <input type="hidden" id="f-mode" value="">
+          <input type="hidden" id="f-type" value="event">
+          <input type="hidden" id="f-id" value="">
+
+          <label class="field-label" id="lbl-title">标题</label>
+          <input id="f-title" class="input" type="text" placeholder="标题">
+
+          <div id="row-period-toggle" class="check-row">
+            <label><input type="checkbox" id="f-period-toggle"> 这是时段（有起止日期）</label>
+          </div>
+
+          <label class="field-label" id="lbl-date">日期</label>
+          <input id="f-date" class="input" type="text" placeholder="例如 1945 / 1945-08-06 / 300 BCE">
+          <div class="date-help" id="date-help">支持：年份、年-月、年-月-日、BCE/BC（公元前）</div>
+
+          <div id="row-enddate" class="field-row" style="display:none">
+            <label class="field-label">结束日期</label>
+            <input id="f-enddate" class="input" type="text" placeholder="结束日期">
+          </div>
+
+          <div id="row-category" class="field-row">
+            <label class="field-label">类别</label>
+            <select id="f-category" class="input"></select>
+          </div>
+
+          <div id="row-color" class="field-row" style="display:none">
+            <label class="field-label">颜色</label>
+            <input id="f-color" class="color-input wide" type="color" value="#2f6fed">
+          </div>
+
+          <div id="row-image" class="field-row" style="display:none">
+            <label class="field-label">图片</label>
+            <input id="f-image" class="input" type="text" placeholder="图片 URL（可选）">
+            <div class="img-row">
+              <button id="btn-pick-image" class="btn btn-sm">选择文件</button>
+              <label class="check-row inline"><input type="checkbox" id="f-show-image" checked> 显示在时间线上</label>
+            </div>
+            <img id="f-image-preview" class="img-preview" alt="" style="display:none">
+            <input type="file" id="f-image-file" accept="image/*" hidden>
+          </div>
+
+          <div id="row-link" class="field-row" style="display:none">
+            <label class="field-label">链接</label>
+            <input id="f-link" class="input" type="text" placeholder="https://…（可选）">
+          </div>
+
+          <div id="row-desc" class="field-row" style="display:none">
+            <label class="field-label">描述</label>
+            <textarea id="f-desc" class="input textarea" rows="4" placeholder="描述、备注…"></textarea>
+          </div>
+
+          <div class="editor-actions">
+            <button id="btn-save" class="btn btn-primary">保存</button>
+            <button id="btn-delete" class="btn btn-danger" style="display:none">删除</button>
+            <button id="btn-cancel" class="btn">取消</button>
+          </div>
+          <div id="editor-error" class="editor-error" style="display:none"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+/* dateutil.js — 日期解析、格式化、刻度生成（BCE/CE 天文年） */
+(function () {
+  'use strict';
+  var TL = window.TL = window.TL || {};
+  var D = {};
+
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // 天文年：1 CE = 1，1 BCE = 0，2 BCE = -1 …（内部统一用天文年）
+  D.MONTHS = MONTHS;
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  function astroYear(y) { return y <= 0 ? (1 - y) : y; }
+
+  // 将"n BCE" 或负数 "-n" 转为天文年；neg/explicitBCE 任一为真即 BCE
+  function toAstro(n, neg, explicitBCE) {
+    if (neg || explicitBCE) return 1 - n;
+    return n;
+  }
+
+  D.parse = function (input) {
+    if (input == null) return null;
+    var s = String(input).trim();
+    if (!s) return null;
+
+    // 模糊前缀
+    s = s.replace(/^(c\.|ca\.?|circa|about|around|approx\.?|~|约|大约)\s*/i, '');
+    s = s.replace(/[?？]$/, '').trim();
+    if (!s) return null;
+
+    // 今天/现在
+    if (/^(today|now|今天|现在|present)$/i.test(s)) {
+      var now = new Date();
+      return now.getFullYear() + now.getMonth() / 12 + (now.getDate() - 1) / 365.25;
+    }
+
+    var explicitBCE = false;
+    var m;
+
+    // 后缀 BCE / BC / 公元前
+    m = s.match(/^(.*?)\s*(B\.?\s*C\.?\s*E?\.?|B\.?\s*C\.?|公元前)$/i);
+    if (m) { explicitBCE = true; s = m[1].trim(); }
+
+    // 前缀 AD / 公元
+    m = s.match(/^(A\.?\s*D\.?|公元)\s*(.+)$/i);
+    if (m) s = m[2].trim();
+
+    // 中文"前300年"
+    m = s.match(/^前(\d+)年?$/);
+    if (m) { explicitBCE = true; s = m[1]; }
+
+    if (!s) return null;
+
+    // 中文"1949年"
+    m = s.match(/^(-?\d{1,6})年$/);
+    if (m) s = m[1];
+
+    // 十年 "1960s"
+    m = s.match(/^(-?)(\d{3,4})s$/i);
+    if (m) return toAstro(parseInt(m[2], 10), m[1] === '-', explicitBCE);
+
+    // YYYY[-MM[-DD]] 或 YYYY年M月D日
+    m = s.match(/^(-?)(\d{1,6})(?:[-/.年](\d{1,2}))?(?:[-/.月](\d{1,2}))?(?:日)?$/);
+    if (m) {
+      var neg = m[1] === '-';
+      var y = parseInt(m[2], 10);
+      var mo = m[3] ? parseInt(m[3], 10) : 0;
+      var d = m[4] ? parseInt(m[4], 10) : 0;
+      y = toAstro(y, neg, explicitBCE);
+      var dec = y;
+      if (mo) dec += (mo - 1) / 12;
+      if (d) dec += (d - 1) / 365.25;
+      return dec;
+    }
+
+    // 纯数字
+    m = s.match(/^(-?)(\d+)$/);
+    if (m) return toAstro(parseInt(m[2], 10), m[1] === '-', explicitBCE);
+
+    return null;
+  };
+
+  // 格式化天文年小数为人类可读字符串
+  D.format = function (t) {
+    if (t == null || isNaN(t)) return '';
+    var y = Math.floor(t);
+    var frac = t - y;
+    var moIdx = Math.floor(frac * 12);
+    var day = Math.floor((frac * 12 - moIdx) * 30.44) + 1;
+    var year = astroYear(y);
+    var era = y <= 0 ? ' BCE' : '';
+
+    if (frac < 1 / 24) return year + era;                    // 纯年份
+    if (day <= 1) return MONTHS[moIdx] + ' ' + year + era;   // 只有月
+    return year + '-' + pad(moIdx + 1) + '-' + pad(day) + era;
+  };
+
+  // 分解
+  D.parts = function (t) {
+    var y = Math.floor(t);
+    var frac = t - y;
+    var moIdx = Math.floor(frac * 12);
+    var day = Math.floor((frac * 12 - moIdx) * 30.44) + 1;
+    return { year: astroYear(y), era: y <= 0 ? 'BCE' : 'CE', month: moIdx + 1, monthName: MONTHS[moIdx], day: day };
+  };
+
+  // 1/2/5 × 10^n
+  D.niceStep = function (raw) {
+    if (raw <= 0) return 1;
+    var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var norm = raw / mag;
+    var nice;
+    if (norm < 1.5) nice = 1;
+    else if (norm < 3) nice = 2;
+    else if (norm < 7) nice = 5;
+    else nice = 10;
+    return nice * mag;
+  };
+
+  // 刻度生成
+  D.ticks = function (t0, t1, pxPerYear, targetGap) {
+    targetGap = targetGap || 96;
+    var raw = targetGap / pxPerYear;
+    var step, unit;
+
+    if (raw >= 1) { unit = 'year'; step = D.niceStep(raw); }
+    else if (raw >= 1 / 12) { unit = 'month'; step = D.niceStep(raw * 12) / 12; }
+    else if (raw >= 1 / 52) { unit = 'week'; step = D.niceStep(raw * 52) / 52; }
+    else if (raw >= 1 / 365.25) { unit = 'day'; step = D.niceStep(raw * 365.25) / 365.25; }
+    else { unit = 'hour'; step = D.niceStep(raw * 365.25 * 24) / (365.25 * 24); }
+
+    var ticks = [];
+    var k0 = Math.ceil(t0 / step - 1e-9);
+    var k1 = Math.floor(t1 / step + 1e-9);
+    for (var k = k0; k <= k1; k++) {
+      var t = k * step;
+      ticks.push({ t: t, label: D.tickLabel(t, unit) });
+    }
+    return { step: step, unit: unit, ticks: ticks };
+  };
+
+  D.tickLabel = function (t, unit) {
+    var p = D.parts(t);
+    switch (unit) {
+      case 'year':
+        return p.era === 'BCE' ? p.year + ' BCE' : String(p.year);
+      case 'month':
+        return p.monthName + ' ' + p.year + (p.era === 'BCE' ? ' BCE' : '');
+      case 'week':
+      case 'day':
+        return p.monthName + ' ' + p.day + ' ' + p.year + (p.era === 'BCE' ? ' BCE' : '');
+      case 'hour':
+        var frac = t - Math.floor(t);
+        var hour = Math.floor(frac * 24);
+        return pad(hour) + ':00';
+      default:
+        return D.format(t);
+    }
+  };
+
+  TL.date = D;
+})();
+
+</script>
+  <script>
+/* model.js — 数据模型 + 撤销/重做 + 变更通知 */
+(function () {
+  'use strict';
+  var TL = window.TL = window.TL || {};
+  var M = {};
+
+  var state = null;
+  var undoStack = [];
+  var redoStack = [];
+  var listeners = [];
+  var _uid = 1;
+
+  function snapshot() { return JSON.parse(JSON.stringify(state)); }
+  function emit() { listeners.forEach(function (fn) { fn(); }); }
+
+  // 兼容单/复数键：event/events、period/periods、era/eras、category/categories
+  function key(type) {
+    if (type === 'event') return 'events';
+    if (type === 'period') return 'periods';
+    if (type === 'era') return 'eras';
+    if (type === 'category') return 'categories';
+    return type;
+  }
+
+  M.uid = function () { return 'id' + (Date.now().toString(36)) + (_uid++).toString(36); };
+
+  M.onChange = function (fn) { listeners.push(fn); };
+
+  M.get = function () { return state; };
+
+  M.setState = function (newState) {
+    state = JSON.parse(JSON.stringify(newState));
+    undoStack = []; redoStack = [];
+    emit();
+  };
+
+  M.reset = function () {
+    state = { title: '我的时间线', categories: [], eras: [], periods: [], events: [] };
+    undoStack = []; redoStack = [];
+    emit();
+  };
+
+  M.setTitle = function (t) {
+    if (!state) return;
+    pushHistory();
+    state.title = t || '我的时间线';
+    emit();
+  };
+
+  function pushHistory() {
+    undoStack.push(snapshot());
+    if (undoStack.length > 120) undoStack.shift();
+    redoStack = [];
+  }
+
+  // 在一次连续拖拽前调用，只记一次快照
+  M.beginUndo = function () { pushHistory(); };
+
+  M.add = function (type, obj) {
+    pushHistory();
+    state[key(type)].push(obj);
+    emit();
+    return obj;
+  };
+
+  M.update = function (type, id, patch, record) {
+    var arr = state[key(type)];
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id === id) {
+        if (record !== false) pushHistory();
+        for (var k in patch) arr[i][k] = patch[k];
+        emit();
+        return arr[i];
+      }
+    }
+    return null;
+  };
+
+  M.remove = function (type, id) {
+    var arr = state[key(type)];
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id === id) {
+        pushHistory();
+        arr.splice(i, 1);
+        emit();
+        return true;
+      }
+    }
+    return false;
+  };
+
+  M.undo = function () {
+    if (!undoStack.length) return false;
+    redoStack.push(snapshot());
+    state = undoStack.pop();
+    emit();
+    return true;
+  };
+
+  M.redo = function () {
+    if (!redoStack.length) return false;
+    undoStack.push(snapshot());
+    state = redoStack.pop();
+    emit();
+    return true;
+  };
+
+  M.canUndo = function () { return undoStack.length > 0; };
+  M.canRedo = function () { return redoStack.length > 0; };
+
+  M.getByType = function (type, id) {
+    var arr = state[key(type)];
+    for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i];
+    return null;
+  };
+
+  // 类别
+  M.defaultCategory = function () {
+    if (state.categories.length) return state.categories[0].id;
+    var c = M.add('categories', { id: M.uid(), name: '默认', color: '#2f6fed' });
+    return c.id;
+  };
+  M.categoryColor = function (id) {
+    for (var i = 0; i < state.categories.length; i++) if (state.categories[i].id === id) return state.categories[i].color;
+    return '#2f6fed';
+  };
+  M.itemColor = function (item) {
+    if (item && item.color) return item.color;
+    if (item && item.categoryId) return M.categoryColor(item.categoryId);
+    return '#2f6fed';
+  };
+
+  // 数据时间范围（含事件/时段/纪元）
+  M.bounds = function () {
+    var s = state;
+    var lo = Infinity, hi = -Infinity;
+    function acc(v) { if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } }
+    s.events.forEach(function (e) { acc(e.date); if (e.endDate != null) acc(e.endDate); });
+    s.periods.forEach(function (p) { acc(p.start); acc(p.end); });
+    s.eras.forEach(function (er) { acc(er.start); acc(er.end); });
+    if (lo === Infinity) { lo = 1900; hi = 2000; }
+    if (hi - lo < 1) { hi = lo + 1; }
+    return { lo: lo, hi: hi };
+  };
+
+  TL.model = M;
+})();
+
+</script>
+  <script>
+/* sample.js — 示例数据：世界历史时间线 */
+(function () {
+  'use strict';
+  var TL = window.TL = window.TL || {};
+
+  var Y = TL.date.parse;
+
+  TL.sample = function () {
+    var cats = [
+      { id: 'cat-politics', name: '政治', color: '#2f6fed' },
+      { id: 'cat-war', name: '战争', color: '#e5484d' },
+      { id: 'cat-science', name: '科技', color: '#0fa968' },
+      { id: 'cat-culture', name: '文化', color: '#a855f7' }
+    ];
+
+    var eras = [
+      { id: 'era-ancient', name: '古代', start: Y('-3000'), end: Y('500'), color: '#b99a5f' },
+      { id: 'era-medieval', name: '中世纪', start: Y('500'), end: Y('1500'), color: '#8a7f8d' },
+      { id: 'era-early', name: '近代早期', start: Y('1500'), end: Y('1800'), color: '#5f8fb9' },
+      { id: 'era-modern', name: '现代', start: Y('1800'), end: Y('2030'), color: '#4aa3df' }
+    ];
+
+    var periods = [
+      { id: 'per-rome', name: '罗马帝国', start: Y('27 BCE'), end: Y('476'), categoryId: 'cat-politics', description: '横跨欧亚非的帝国' },
+      { id: 'per-ming', name: '明朝', start: Y('1368'), end: Y('1644'), categoryId: 'cat-politics', description: '中国历史上最后一个由汉族建立的大一统王朝' },
+      { id: 'per-industry', name: '工业革命', start: Y('1760'), end: Y('1840'), categoryId: 'cat-science', description: '机器生产取代手工劳动' },
+      { id: 'per-ww2', name: '第二次世界大战', start: Y('1939'), end: Y('1945'), categoryId: 'cat-war', description: '全球规模最大的战争' }
+    ];
+
+    var events = [
+      { id: 'ev-pyramid', title: '胡夫金字塔建成', date: Y('-2560'), categoryId: 'cat-culture', description: '古埃及第四王朝法老胡夫的陵墓' },
+      { id: 'ev-confucius', title: '孔子诞生', date: Y('-551'), categoryId: 'cat-culture', description: '儒家学派创始人' },
+      { id: 'ev-paper', title: '蔡伦改进造纸术', date: Y('105'), categoryId: 'cat-science', description: '东汉，造纸术成熟并推广' },
+      { id: 'ev-gutenberg', title: '古腾堡印刷机', date: Y('1440'), categoryId: 'cat-science', description: '活字印刷，开启信息传播革命' },
+      { id: 'ev-columbus', title: '哥伦布到达美洲', date: Y('1492'), categoryId: 'cat-politics', description: '开启大航海时代' },
+      { id: 'ev-usa', title: '《独立宣言》发表', date: Y('1776'), categoryId: 'cat-politics', description: '美利坚合众国宣告独立' },
+      { id: 'ev-marx', title: '《共产党宣言》发表', date: Y('1848'), categoryId: 'cat-politics', description: '马克思与恩格斯' },
+      { id: 'ev-telephone', title: '贝尔发明电话', date: Y('1876'), categoryId: 'cat-science' },
+      { id: 'ev-einstein', title: '爱因斯坦提出相对论', date: Y('1905'), categoryId: 'cat-science', description: '狭义相对论' },
+      { id: 'ev-ww1', title: '第一次世界大战爆发', date: Y('1914'), categoryId: 'cat-war' },
+      { id: 'ev-moon', title: '阿波罗11号登月', date: Y('1969-07-20'), categoryId: 'cat-science', description: '人类首次踏上月球' },
+      { id: 'ev-berlin', title: '柏林墙倒塌', date: Y('1989-11-09'), categoryId: 'cat-politics' },
+      { id: 'ev-www', title: '万维网诞生', date: Y('1991'), categoryId: 'cat-science', description: '蒂姆·伯纳斯-李发布 World Wide Web' }
+    ];
+
+    return {
+      title: '世界历史时间线',
+      categories: cats,
+      eras: eras,
+      periods: periods,
+      events: events
+    };
+  };
+})();
+
+</script>
+  <script>
+/* render.js — Canvas 时间线渲染（纪元/时段/事件/刻度/图片）+ 命中区域 */
+(function () {
+  'use strict';
+  var TL = window.TL = window.TL || {};
+  var R = {};
+
+  var canvas = null, ctx = null;
+  var FONT = '-apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, Arial, sans-serif';
+
+  var MARGIN = 60;        // 左右留白（CSS px）
+  var AXIS_RATIO = 0.55;  // 轴线纵向位置（中间偏下）
+
+  R.view = { t0: -3500, t1: 2040 };
+  R.refSpan = 5540;
+  R.selection = { type: null, id: null };
+  R.hits = [];
+  R.metrics = null;
+  R.onImageLoad = null;
+  R.w = 0; R.h = 0; R.dpr = 1;
+
+  var imgCache = {};
+
+  R.init = function (cv) { canvas = cv; ctx = canvas.getContext('2d'); };
+
+  R.resize = function (cssW, cssH, dpr) {
+    R.w = cssW; R.h = cssH; R.dpr = dpr || 1;
+    canvas.width = Math.round(cssW * R.dpr);
+    canvas.height = Math.round(cssH * R.dpr);
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    R.draw();
+  };
+
+  R.timeToX = function (t) {
+    var m = R.metrics;
+    if (!m) return 0;
+    return m.m + (t - m.t0) * m.ppy;
+  };
+  R.xToTime = function (x) {
+    var m = R.metrics;
+    if (!m) return 0;
+    return m.t0 + (x - m.m) / m.ppy;
+  };
+
+  // ---- 颜色工具 ----
+  function hexToRgb(hex) {
+    hex = String(hex || '#2f6fed').replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+    var n = parseInt(hex, 16);
+    if (isNaN(n)) n = 0x2f6fed;
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+  function hexA(hex, a) { var c = hexToRgb(hex); return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + a + ')'; }
+  function shade(hex, f) {
+    var c = hexToRgb(hex);
+    if (f < 0) { var k = 1 + f; return 'rgb(' + Math.round(c.r * k) + ',' + Math.round(c.g * k) + ',' + Math.round(c.b * k) + ')'; }
+    return 'rgb(' + Math.round(c.r + (255 - c.r) * f) + ',' + Math.round(c.g + (255 - c.g) * f) + ',' + Math.round(c.b + (255 - c.b) * f) + ')';
+  }
+
+  function rr(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function ellipsis(text, maxW) {
+    if (ctx.measureText(text).width <= maxW) return text;
+    var t = text;
+    while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+    return t + '…';
+  }
+  function isSel(type, id) { return R.selection && R.selection.type === type && R.selection.id === id; }
+
+  function getImg(src) {
+    if (!src) return null;
+    var im = imgCache[src];
+    if (im === undefined) {
+      im = new Image();
+      im.onload = function () { if (R.onImageLoad) R.onImageLoad(); };
+      im.onerror = function () { imgCache[src] = null; };
+      im.src = src;
+      imgCache[src] = im;
+      return null;
+    }
+    if (im && im.complete && im.naturalWidth) return im;
+    return null;
+  }
+
+  // ---- 主绘制 ----
+  R.draw = function () {
+    if (!ctx || !canvas) return;
+    var w = R.w, h = R.h;
+    if (!w || !h) return;
+    ctx.setTransform(R.dpr, 0, 0, R.dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    var m = MARGIN;
+    var plotW = w - m * 2;
+    var t0 = R.view.t0, t1 = R.view.t1;
+    if (t1 <= t0) return;
+    var ppy = plotW / (t1 - t0);
+    var axisY = Math.round(h * AXIS_RATIO);
+
+    R.metrics = { m: m, plotW: plotW, t0: t0, t1: t1, ppy: ppy, axisY: axisY, w: w, h: h };
+    R.hits = [];
+
+    var model = TL.model.get();
+    if (!model) return;
+
+    drawEras(model, m, w, h);
+    drawGrid(model, m, w, h, t0, t1, ppy, axisY);
+    drawAxis(m, w, axisY);
+    drawPeriods(model, m, w, h, axisY);
+    drawEvents(model, m, w, h, axisY);
+  };
+
+  function drawEras(model, m, w, h) {
+    var eras = model.eras.slice().sort(function (a, b) { return a.start - b.start; });
+    ctx.textBaseline = 'top';
+    ctx.font = '700 12px ' + FONT;
+    eras.forEach(function (er) {
+      var x0 = R.timeToX(er.start), x1 = R.timeToX(er.end);
+      var c = TL.model.itemColor(er);
+      if (x1 < x0) { var tmp = x0; x0 = x1; x1 = tmp; }
+      // 完全在可视区外 → 跳过（不画色带、不画名称，避免贴边堆积）
+      if (x1 < 0 || x0 > w) return;
+
+      var vx0 = Math.max(x0, 0);
+      var vx1 = Math.min(x1, w);
+      ctx.fillStyle = hexA(c, 0.10);
+      ctx.fillRect(vx0, 0, vx1 - vx0, h);
+      ctx.fillStyle = hexA(c, 0.55);
+      ctx.fillRect(vx0, 0, 2, h);
+
+      var label = er.name || '(未命名纪元)';
+      var lw = ctx.measureText(label).width;
+      // 名称在纪元的可见部分居中（超出部分自然裁掉，不贴边）
+      var lx = vx0 + (vx1 - vx0) / 2 - lw / 2;
+      ctx.fillStyle = shade(c, -0.35);
+      ctx.fillText(label, lx, 7);
+      R.hits.push({ type: 'era', id: er.id, x: lx - 2, y: 5, w: lw + 4, h: 17 });
+    });
+  }
+
+  function drawGrid(model, m, w, h, t0, t1, ppy, axisY) {
+    var tk = TL.date.ticks(t0, t1, ppy, 96);
+    ctx.strokeStyle = '#eef2f7';
+    ctx.lineWidth = 1;
+    tk.ticks.forEach(function (tick) {
+      var x = R.timeToX(tick.t);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    });
+    R.ticks = tk;
+  }
+
+  function drawAxis(m, w, axisY) {
+    ctx.strokeStyle = '#b7c2d1';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(m, axisY); ctx.lineTo(w - m, axisY); ctx.stroke();
+
+    // 刻度标签
+    var tk = R.ticks;
+    if (!tk) return;
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '11px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    tk.ticks.forEach(function (tick) {
+      var x = R.timeToX(tick.t);
+      ctx.strokeStyle = '#9fb0c4';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, axisY); ctx.lineTo(x, axisY + 7); ctx.stroke();
+      ctx.fillText(tick.label, x, axisY + 10);
+    });
+  }
+
+  function drawPeriods(model, m, w, h, axisY) {
+    var periods = model.periods.slice().sort(function (a, b) { return a.start - b.start; });
+    var rows = [];
+    var meta = [];
+    periods.forEach(function (p) {
+      var x0 = R.timeToX(p.start), x1 = R.timeToX(p.end);
+      if (x1 < x0) { var t = x0; x0 = x1; x1 = t; }
+      // 完全在可视区外 → 跳过（不画、不占行，避免贴边堆积）
+      if (x1 < m || x0 > w - m) return;
+      x0 = Math.max(x0, m);
+      x1 = Math.min(x1, w - m);
+      var row = 0;
+      while (row < rows.length && rows[row].right > x0 + 2) row++;
+      if (row === rows.length) rows.push({ right: -1e9 });
+      rows[row].right = x1 + 10;
+      meta.push({ p: p, x0: x0, x1: x1, row: row });
+    });
+
+    var barH = 24, gap = 8;
+    ctx.font = '600 12px ' + FONT;
+    meta.forEach(function (it) {
+      var y = axisY + 18 + it.row * (barH + gap);
+      var c = TL.model.itemColor(it.p);
+      var sel = isSel('period', it.p.id);
+      rr(it.x0, y, it.x1 - it.x0, barH, 6);
+      ctx.fillStyle = c;
+      ctx.fill();
+      if (sel) { ctx.strokeStyle = '#0b1220'; ctx.lineWidth = 2; ctx.stroke(); }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      var pad = 6;
+      var innerW = (it.x1 - it.x0) - pad * 2;
+      if (innerW > 16) {
+        ctx.save();
+        ctx.beginPath(); ctx.rect(it.x0 + pad, y, innerW, barH); ctx.clip();
+        ctx.fillText(ellipsis(it.p.name || '(未命名)', innerW), it.x0 + pad, y + barH / 2 + 0.5);
+        ctx.restore();
+      }
+
+      ctx.fillStyle = '#6b7280';
+      ctx.font = '10px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(TL.date.format(it.p.start), it.x0, y + barH + 3);
+      ctx.fillText(TL.date.format(it.p.end), it.x1, y + barH + 3);
+
+      if (sel) {
+        ctx.fillStyle = '#0b1220';
+        ctx.fillRect(it.x0 - 3, y - 3, 6, barH + 6);
+        ctx.fillRect(it.x1 - 3, y - 3, 6, barH + 6);
+      }
+
+      R.hits.push({ type: 'period', id: it.p.id, part: 'move', x: it.x0 + 6, y: y, w: it.x1 - it.x0 - 12, h: barH });
+      R.hits.push({ type: 'period', id: it.p.id, part: 'start', x: it.x0 - 6, y: y - 3, w: 12, h: barH + 6 });
+      R.hits.push({ type: 'period', id: it.p.id, part: 'end', x: it.x1 - 6, y: y - 3, w: 12, h: barH + 6 });
+    });
+  }
+
+  function drawEvents(model, m, w, h, axisY) {
+    var events = model.events.slice().sort(function (a, b) { return a.date - b.date; });
+    ctx.font = '500 12px ' + FONT;
+    var lanes = [];
+    var meta = [];
+    events.forEach(function (ev) {
+      var x = R.timeToX(ev.date);
+      var label = ev.title || '(未命名)';
+      var lw = ctx.measureText(label).width + 18;
+      var hasThumb = !!(ev.image && ev.showImage !== false);
+      var effW = hasThumb ? Math.max(lw, 76) : lw;
+      var lane = 0;
+      while (lane < lanes.length && lanes[lane].right > x - effW / 2) lane++;
+      if (lane === lanes.length) lanes.push({ right: -1e9 });
+      lanes[lane].right = x + effW / 2 + 6;
+      meta.push({ ev: ev, x: x, label: label, lw: lw, lane: lane, hasThumb: hasThumb });
+    });
+
+    var labelH = 20;
+    meta.forEach(function (it) {
+      var ev = it.ev;
+      var c = TL.model.itemColor(ev);
+      var sel = isSel('event', ev.id);
+      var labelY = axisY - 28 - it.lane * 30;
+      var labelBottom = labelY + labelH;
+
+      // 图片缩略图
+      var thH = 0;
+      if (it.hasThumb) {
+        var thW = 64; thH = 44;
+        var thX = it.x - thW / 2, thY = labelY - thH - 6;
+        var img = getImg(ev.image);
+        if (img) ctx.drawImage(img, thX, thY, thW, thH);
+        else { ctx.fillStyle = '#eef2f7'; ctx.fillRect(thX, thY, thW, thH); }
+        ctx.strokeStyle = hexA(c, 0.5);
+        ctx.lineWidth = 1;
+        ctx.strokeRect(thX + 0.5, thY + 0.5, thW - 1, thH - 1);
+        R.hits.push({ type: 'event', id: ev.id, part: 'select', x: thX, y: thY, w: thW, h: thH });
+      }
+
+      // 连接线
+      ctx.strokeStyle = '#c7d0dc';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(it.x, axisY - 3); ctx.lineTo(it.x, labelBottom); ctx.stroke();
+
+      // 标签框
+      rr(it.x - it.lw / 2, labelY, it.lw, labelH, 6);
+      ctx.fillStyle = sel ? '#e8f0fe' : '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = sel ? '#2f6fed' : hexA(c, 0.55);
+      ctx.lineWidth = sel ? 2 : 1;
+      ctx.stroke();
+
+      ctx.fillStyle = '#1f2937';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.save();
+      ctx.beginPath(); ctx.rect(it.x - it.lw / 2 + 4, labelY, it.lw - 8, labelH); ctx.clip();
+      ctx.fillText(ellipsis(it.label, it.lw - 8), it.x, labelY + labelH / 2 + 0.5);
+      ctx.restore();
+
+      // 圆点
+      ctx.beginPath(); ctx.arc(it.x, axisY, sel ? 5 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = c;
+      ctx.fill();
+      if (sel) { ctx.strokeStyle = '#0b1220'; ctx.lineWidth = 2; ctx.stroke(); }
+
+      // 年份
+      ctx.fillStyle = '#9aa3b2';
+      ctx.font = '10px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(TL.date.format(ev.date), it.x, axisY + 6);
+
+      R.hits.push({ type: 'event', id: ev.id, part: 'move', x: it.x - 9, y: axisY - 9, w: 18, h: 18 });
+      R.hits.push({ type: 'event', id: ev.id, part: 'select', x: it.x - it.lw / 2, y: labelY, w: it.lw, h: labelH });
+    });
+  }
+
+  R.hitTest = function (x, y) {
+    for (var i = R.hits.length - 1; i >= 0; i--) {
+      var r = R.hits[i];
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return r;
+    }
+    return null;
+  };
+
+  // ---- 视图操作 ----
+  R.fit = function () {
+    var b = TL.model.bounds();
+    var pad = (b.hi - b.lo) * 0.08 || 1;
+    R.view.t0 = b.lo - pad;
+    R.view.t1 = b.hi + pad;
+    R.refSpan = R.view.t1 - R.view.t0;
+  };
+
+  R.zoomBy = function (factor, cx) {
+    var m = R.metrics;
+    if (!m) return;
+    var t = R.xToTime(cx);
+    var span = R.view.t1 - R.view.t0;
+    var newSpan = span / factor;
+    if (newSpan < 1e-6 || newSpan > 1e9) return;
+    var f = (cx - m.m) / m.plotW;
+    R.view.t0 = t - newSpan * f;
+    R.view.t1 = t + newSpan * (1 - f);
+  };
+
+  R.panBy = function (dxPx) {
+    var m = R.metrics;
+    if (!m) return;
+    var dt = -dxPx / m.ppy;
+    R.view.t0 += dt;
+    R.view.t1 += dt;
+  };
+
+  R.zoomLabel = function () {
+    if (!R.metrics) return '100%';
+    var span = R.view.t1 - R.view.t0;
+    var ref = R.refSpan || span || 1;
+    return Math.round(100 * ref / span) + '%';
+  };
+
+  R.ctx = function () { return ctx; };
+
+  // 将当前模型绘制到指定画布（用于导出），绘制后恢复原画布
+  R.renderToCanvas = function (targetCv, cssW, cssH, dpr, view) {
+    var old = {
+      canvas: canvas, ctx: ctx, w: R.w, h: R.h, dpr: R.dpr,
+      t0: R.view.t0, t1: R.view.t1, metrics: R.metrics, hits: R.hits
+    };
+    canvas = targetCv;
+    ctx = targetCv.getContext('2d');
+    targetCv.width = Math.round(cssW * dpr);
+    targetCv.height = Math.round(cssH * dpr);
+    R.w = cssW; R.h = cssH; R.dpr = dpr;
+    R.view.t0 = view.t0; R.view.t1 = view.t1;
+    R.draw();
+    canvas = old.canvas; ctx = old.ctx;
+    R.w = old.w; R.h = old.h; R.dpr = old.dpr;
+    R.view.t0 = old.t0; R.view.t1 = old.t1;
+    R.metrics = old.metrics; R.hits = old.hits;
+  };
+
+  TL.render = R;
+})();
+
+</script>
+  <script>
+/* interaction.js — 指针交互：选中 / 拖拽改期 / 缩放平移 */
+(function () {
+  'use strict';
+  var TL = window.TL = window.TL || {};
+  var I = {};
+
+  var canvas = null;
+  var R = null;
+  var drag = null;
+
+  function pos(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+  function clampTime(t) {
+    if (t < -999999) return -999999;
+    if (t > 999999) return 999999;
+    return t;
+  }
+
+  I.init = function (cv) {
+    canvas = cv;
+    R = TL.render;
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onUp);
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('dblclick', onDbl);
+    canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  };
+
+  function onDown(e) {
+    var p = pos(e);
+    var hit = R.hitTest(p.x, p.y);
+    if (hit) {
+      if (hit.type === 'era') { TL.ui.select('era', hit.id); return; }
+      if (hit.type === 'event') {
+        TL.ui.select('event', hit.id);
+        if (hit.part === 'move') drag = { kind: 'event', id: hit.id, moved: false };
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+      if (hit.type === 'period') {
+        TL.ui.select('period', hit.id);
+        drag = { kind: 'period', id: hit.id, part: hit.part, moved: false };
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+      return;
+    }
+    TL.ui.select(null, null);
+    drag = { kind: 'pan', startX: p.x, startT0: R.view.t0, startT1: R.view.t1 };
+    canvas.setPointerCapture(e.pointerId);
+    canvas.classList.add('panning');
+  }
+
+  function onMove(e) {
+    var p = pos(e);
+    if (!drag) { updateCursor(p); return; }
+
+    if (drag.kind === 'pan') {
+      var dx = p.x - drag.startX;
+      var dt = -dx / R.metrics.ppy;
+      R.view.t0 = drag.startT0 + dt;
+      R.view.t1 = drag.startT1 + dt;
+      TL.ui.refresh(true);
+      return;
+    }
+
+    if (drag.kind === 'event') {
+      if (!drag.moved) { TL.model.beginUndo(); drag.moved = true; }
+      var t = clampTime(R.xToTime(p.x));
+      TL.model.update('event', drag.id, { date: t, dateStr: TL.date.format(t) }, false);
+      return;
+    }
+
+    if (drag.kind === 'period') {
+      var pr = TL.model.getByType('period', drag.id);
+      if (!pr) return;
+      var tt = clampTime(R.xToTime(p.x));
+      var patch = null;
+      if (drag.part === 'start') {
+        if (tt < pr.end) patch = { start: tt, startStr: TL.date.format(tt) };
+      } else if (drag.part === 'end') {
+        if (tt > pr.start) patch = { end: tt, endStr: TL.date.format(tt) };
+      } else {
+        var span = pr.end - pr.start;
+        var ns = tt - span / 2;
+        patch = { start: ns, end: ns + span, startStr: TL.date.format(ns), endStr: TL.date.format(ns + span) };
+      }
+      if (patch) {
+        if (!drag.moved) { TL.model.beginUndo(); drag.moved = true; }
+        TL.model.update('period', drag.id, patch, false);
+      }
+      return;
+    }
+  }
+
+  function onUp(e) {
+    if (drag) {
+      canvas.classList.remove('panning');
+      drag = null;
+      try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+      TL.ui.refresh();
+    }
+  }
+
+  function onWheel(e) {
+    e.preventDefault();
+    var p = pos(e);
+    var factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    R.zoomBy(factor, p.x);
+    TL.ui.refresh(true);
+  }
+
+  function onDbl() {
+    R.fit();
+    TL.ui.refresh(true);
+  }
+
+  function updateCursor(p) {
+    var hit = R.hitTest(p.x, p.y);
+    if (!hit) { canvas.style.cursor = 'grab'; return; }
+    if (hit.type === 'period' && (hit.part === 'start' || hit.part === 'end')) { canvas.style.cursor = 'ew-resize'; return; }
+    if (hit.type === 'event' && hit.part === 'move') { canvas.style.cursor = 'grab'; return; }
+    if (hit.type === 'era') { canvas.style.cursor = 'pointer'; return; }
+    canvas.style.cursor = 'pointer';
+  }
+
+  TL.interaction = I;
+})();
+
+</script>
+  <script>
+/* ui.js — 工具栏 / 列表 / 属性表单 / 类别管理 */
+(function () {
+  'use strict';
+  var TL = window.TL = window.TL || {};
+  var UI = {};
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // 编辑状态
+  UI.mode = '';      // '' | 'create' | 'edit'
+  UI.type = 'event';
+  UI.id = null;
+
+  var PALETTE = ['#2f6fed', '#e5484d', '#0fa968', '#a855f7', '#f59e0b', '#0891b2', '#db2777', '#65a30d'];
+
+  UI.init = function () {
+    TL.model.onChange(function () { UI.refresh(); });
+
+    // 工具栏
+    $('btn-add-event').addEventListener('click', function () { UI.newItem('event'); });
+    $('btn-add-period').addEventListener('click', function () { UI.newItem('period'); });
+    $('btn-add-era').addEventListener('click', function () { UI.newItem('era'); });
+    $('btn-undo').addEventListener('click', function () { TL.model.undo(); });
+    $('btn-redo').addEventListener('click', function () { TL.model.redo(); });
+    $('btn-zoom-out').addEventListener('click', function () { TL.render.zoomBy(1 / 1.4, TL.render.w / 2); UI.refresh(true); });
+    $('btn-zoom-in').addEventListener('click', function () { TL.render.zoomBy(1.4, TL.render.w / 2); UI.refresh(true); });
+    $('btn-fit').addEventListener('click', function () { TL.render.fit(); UI.refresh(true); });
+    $('btn-sample').addEventListener('click', function () { TL.model.setState(TL.sample()); UI.select(null, null); TL.render.fit(); UI.refresh(); });
+    $('btn-clear').addEventListener('click', function () {
+      if (confirm('确定清空当前时间线的全部内容？')) { TL.model.reset(); UI.select(null, null); TL.render.fit(); UI.refresh(); }
+    });
+
+    $('btn-png').addEventListener('click', function () { TL.export.png(); });
+    $('btn-save-json').addEventListener('click', function () { TL.export.saveJSON(); });
+    $('btn-load-json').addEventListener('click', function () { $('file-json').click(); });
+    $('file-json').addEventListener('change', function (e) { TL.export.loadJSONFile(e.target.files[0]); e.target.value = ''; });
+    $('btn-print').addEventListener('click', function () { TL.export.print(); });
+
+    $('tl-title').addEventListener('change', function () {
+      TL.model.setTitle(this.value.trim() || '我的时间线');
+    });
+
+    // 左侧浏览
+    $('search').addEventListener('input', function () { UI.rebuildList(); });
+    $('cat-filter').addEventListener('change', function () { UI.rebuildList(); });
+
+    // 表单
+    $('f-period-toggle').addEventListener('change', function () {
+      $('row-enddate').style.display = this.checked ? 'flex' : 'none';
+    });
+    $('f-image').addEventListener('input', function () { UI.updateImagePreview(); });
+    $('btn-pick-image').addEventListener('click', function () { $('f-image-file').click(); });
+    $('f-image-file').addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        $('f-image').value = reader.result;
+        UI.updateImagePreview();
+      };
+      reader.readAsDataURL(f);
+      e.target.value = '';
+    });
+    $('btn-save').addEventListener('click', function () { UI.submit(); });
+    $('btn-delete').addEventListener('click', function () { UI.deleteSelected(); });
+    $('btn-cancel').addEventListener('click', function () { UI.select(null, null); });
+
+    // 类别
+    $('btn-add-cat').addEventListener('click', function () { UI.addCategory(); });
+    $('new-cat-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') UI.addCategory(); });
+
+    UI.showEmptyEditor();
+  };
+
+  // ---------- 刷新 ----------
+  UI.refresh = function (light) {
+    TL.render.draw();
+    UI.updateZoomLabel();
+    UI.updateUndoButtons();
+    if (light) return;
+    UI.rebuildList();
+    UI.rebuildCategories();
+    UI.updateTitle();
+    UI.updateCounts();
+    UI.syncEditor();
+  };
+
+  UI.updateZoomLabel = function () { $('zoom-label').textContent = TL.render.zoomLabel(); };
+  UI.updateUndoButtons = function () {
+    $('btn-undo').disabled = !TL.model.canUndo();
+    $('btn-redo').disabled = !TL.model.canRedo();
+  };
+  UI.updateTitle = function () { $('tl-title').value = TL.model.get().title || '我的时间线'; };
+
+  UI.updateCounts = function () {
+    var s = TL.model.get();
+    $('counts').textContent = s.events.length + ' 事件 · ' + s.periods.length + ' 时段 · ' + s.eras.length + ' 纪元';
+  };
+
+  // ---------- 选中 ----------
+  UI.select = function (type, id) {
+    if (!type || !id) {
+      TL.render.selection = { type: null, id: null };
+      UI.mode = ''; UI.type = 'event'; UI.id = null;
+      UI.showEmptyEditor();
+      UI.rebuildList();
+      TL.render.draw();
+      return;
+    }
+    TL.render.selection = { type: type, id: id };
+    UI.mode = 'edit'; UI.type = type; UI.id = id;
+    UI.layoutEditor(type);
+    UI.fillEditor(type, id);
+    UI.rebuildList();
+    TL.render.draw();
+  };
+
+  UI.newItem = function (type) {
+    UI.mode = 'create'; UI.type = type; UI.id = null;
+    TL.render.selection = { type: null, id: null };
+    UI.layoutEditor(type);
+    var s = TL.model.get();
+    var today = TL.date.format(new Date().getFullYear());
+    var catId = s.categories.length ? s.categories[0].id : null;
+
+    $('f-title').value = '';
+    $('f-period-toggle').checked = false;
+    $('f-date').value = type === 'era' ? '-3000' : (type === 'period' ? '1900' : today);
+    $('f-enddate').value = type === 'era' ? '500' : '2000';
+    $('f-category').value = catId || '';
+    $('f-color').value = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+    $('f-image').value = ''; $('f-show-image').checked = true;
+    $('f-link').value = ''; $('f-desc').value = '';
+    UI.updateImagePreview();
+    $('row-enddate').style.display = (type === 'event') ? 'none' : 'flex';
+    UI.showError('');
+    $('btn-delete').style.display = 'none';
+    $('editor-head').textContent = { event: '新建事件', period: '新建时段', era: '新建纪元' }[type];
+    UI.rebuildList();
+    TL.render.draw();
+    setTimeout(function () { $('f-title').focus(); }, 0);
+  };
+
+  UI.showEmptyEditor = function () {
+    UI.layoutEditor(null);
+    $('editor-head').textContent = '属性';
+    $('editor-error').style.display = 'none';
+  };
+
+  // 根据类型显示/隐藏字段
+  UI.layoutEditor = function (type) {
+    var show = function (id, on) { $(id).style.display = on ? 'flex' : 'none'; };
+    show('row-period-toggle', type === 'event');
+    show('row-category', type === 'event' || type === 'period');
+    show('row-color', type === 'era');
+    show('row-image', type === 'event');
+    show('row-link', type === 'event');
+    show('row-desc', type === 'event' || type === 'period');
+
+    if (!type) {
+      ['row-period-toggle', 'row-category', 'row-color', 'row-image', 'row-link', 'row-desc', 'row-enddate'].forEach(function (id) { show(id, false); });
+      $('lbl-title').style.display = 'none';
+      $('f-title').style.display = 'none';
+      $('lbl-date').style.display = 'none';
+      $('f-date').style.display = 'none';
+      $('date-help').style.display = 'none';
+      $('btn-save').style.display = 'none';
+      $('btn-delete').style.display = 'none';
+      $('btn-cancel').style.display = 'none';
+      return;
+    }
+
+    $('lbl-title').style.display = '';
+    $('f-title').style.display = '';
+    $('lbl-date').style.display = '';
+    $('f-date').style.display = '';
+    $('date-help').style.display = '';
+    $('btn-save').style.display = '';
+    $('btn-delete').style.display = (UI.mode === 'edit') ? '' : 'none';
+    $('btn-cancel').style.display = '';
+
+    $('lbl-title').textContent = type === 'era' ? '名称' : '标题';
+    $('lbl-date').textContent = type === 'event' ? '日期' : '开始日期';
+    $('row-enddate').style.display = (type === 'event') ? ($('f-period-toggle').checked ? 'flex' : 'none') : 'flex';
+  };
+
+  UI.fillEditor = function (type, id) {
+    var item = TL.model.getByType(type, id);
+    if (!item) return;
+    $('editor-head').textContent = { event: '编辑事件', period: '编辑时段', era: '编辑纪元' }[type];
+    $('f-title').value = item.title || item.name || '';
+    $('f-period-toggle').checked = !!(type === 'event' && item.endDate != null);
+    $('f-date').value = (type === 'event') ? (item.dateStr || TL.date.format(item.date))
+      : (item.startStr || TL.date.format(item.start));
+    $('f-enddate').value = (type === 'event') ? (item.endDateStr || (item.endDate != null ? TL.date.format(item.endDate) : ''))
+      : (item.endStr || TL.date.format(item.end));
+    $('f-category').value = item.categoryId || '';
+    $('f-color').value = item.color || '#2f6fed';
+    $('f-image').value = item.image || '';
+    $('f-show-image').checked = item.showImage !== false;
+    $('f-link').value = item.link || '';
+    $('f-desc').value = item.description || '';
+    $('row-enddate').style.display = (type === 'event') ? (item.endDate != null ? 'flex' : 'none') : 'flex';
+    UI.updateImagePreview();
+    UI.showError('');
+  };
+
+  UI.syncEditor = function () {
+    // 正在输入时不打断
+    var ae = document.activeElement;
+    if (ae && ae.closest && ae.closest('.editor-body')) return;
+    if (UI.mode === 'edit' && UI.id) {
+      UI.layoutEditor(UI.type);
+      UI.fillEditor(UI.type, UI.id);
+    } else if (UI.mode === 'create') {
+      // 保持当前填写内容
+      UI.layoutEditor(UI.type);
+    } else {
+      UI.showEmptyEditor();
+    }
+  };
+
+  UI.updateImagePreview = function () {
+    var src = $('f-image').value.trim();
+    var img = $('f-image-preview');
+    if (src) { img.src = src; img.style.display = ''; }
+    else { img.removeAttribute('src'); img.style.display = 'none'; }
+  };
+
+  UI.showError = function (msg) {
+    var el = $('editor-error');
+    if (msg) { el.textContent = msg; el.style.display = ''; }
+    else { el.textContent = ''; el.style.display = 'none'; }
+  };
+
+  // ---------- 提交 / 删除 ----------
+  UI.submit = function () {
+    var type = UI.type;
+    var title = $('f-title').value.trim();
+    if (!title) { UI.showError('标题不能为空'); return; }
+
+    var dateStr = $('f-date').value.trim();
+    var date = TL.date.parse(dateStr);
+    if (date == null) { UI.showError('日期无法解析：' + (dateStr || '空')); return; }
+
+    var endStr = '', end = null;
+    var needEnd = (type !== 'event') || $('f-period-toggle').checked;
+    if (needEnd) {
+      endStr = $('f-enddate').value.trim();
+      end = TL.date.parse(endStr);
+      if (end == null) { UI.showError('结束日期无法解析：' + (endStr || '空')); return; }
+      if (end <= date) { UI.showError('结束日期必须晚于开始日期'); return; }
+    }
+
+    var common = {
+      title: title,
+      description: $('f-desc').value.trim(),
+      categoryId: $('f-category').value || null,
+      color: $('f-color').value
+    };
+
+    if (type === 'event') {
+      var ev = {
+        title: title,
+        date: date, dateStr: dateStr,
+        endDate: needEnd ? end : null, endDateStr: needEnd ? endStr : null,
+        description: common.description,
+        categoryId: common.categoryId,
+        image: $('f-image').value.trim(),
+        showImage: $('f-show-image').checked,
+        link: $('f-link').value.trim()
+      };
+      if (UI.mode === 'edit') { TL.model.update('events', UI.id, ev); }
+      else { var n1 = TL.model.add('events', ev); UI.id = n1.id; UI.mode = 'edit'; }
+    } else if (type === 'period') {
+      var pr = {
+        name: title,
+        start: date, startStr: dateStr,
+        end: end, endStr: endStr,
+        description: common.description,
+        categoryId: common.categoryId
+      };
+      if (UI.mode === 'edit') { TL.model.update('periods', UI.id, pr); }
+      else { var n2 = TL.model.add('periods', pr); UI.id = n2.id; UI.mode = 'edit'; }
+    } else if (type === 'era') {
+      var er = { name: title, start: date, startStr: dateStr, end: end, endStr: endStr, color: common.color };
+      if (UI.mode === 'edit') { TL.model.update('eras', UI.id, er); }
+      else { var n3 = TL.model.add('eras', er); UI.id = n3.id; UI.mode = 'edit'; }
+    }
+
+    UI.select(UI.type, UI.id);
+  };
+
+  UI.deleteSelected = function () {
+    if (UI.mode !== 'edit' || !UI.id) return;
+    if (!confirm('删除这个' + ({ event: '事件', period: '时段', era: '纪元' }[UI.type] || '元素') + '？')) return;
+    var map = { event: 'events', period: 'periods', era: 'eras' };
+    TL.model.remove(map[UI.type], UI.id);
+    UI.select(null, null);
+  };
+
+  // ---------- 类别 ----------
+  UI.rebuildCategories = function () {
+    var s = TL.model.get();
+    var box = $('cat-list');
+    box.innerHTML = '';
+    s.categories.forEach(function (c) {
+      var row = document.createElement('div');
+      row.className = 'cat-item';
+      var dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = c.color;
+      var n = document.createElement('span'); n.className = 'n'; n.textContent = c.name;
+      var x = document.createElement('button'); x.className = 'x'; x.textContent = '×';
+      x.title = '删除类别';
+      x.addEventListener('click', function () {
+        if (confirm('删除类别「' + c.name + '」？其下元素将使用默认颜色。')) {
+          TL.model.remove('categories', c.id);
+        }
+      });
+      row.appendChild(dot); row.appendChild(n); row.appendChild(x);
+      box.appendChild(row);
+    });
+
+    // f-category 下拉
+    var sel = $('f-category');
+    var cur = sel.value;
+    sel.innerHTML = '';
+    if (!s.categories.length) {
+      var o0 = document.createElement('option'); o0.value = ''; o0.textContent = '（无类别）';
+      sel.appendChild(o0);
+    }
+    s.categories.forEach(function (c) {
+      var o = document.createElement('option'); o.value = c.id; o.textContent = c.name;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+
+    // 浏览过滤下拉
+    var filt = $('cat-filter');
+    var curF = filt.value;
+    filt.innerHTML = '';
+    var all = document.createElement('option'); all.value = ''; all.textContent = '全部类别';
+    filt.appendChild(all);
+    s.categories.forEach(function (c) {
+      var o = document.createElement('option'); o.value = c.id; o.textContent = c.name;
+      filt.appendChild(o);
+    });
+    filt.value = curF;
+  };
+
+  UI.addCategory = function () {
+    var name = $('new-cat-name').value.trim();
+    if (!name) return;
+    var color = $('new-cat-color').value;
+    // 重名检查
+    var s = TL.model.get();
+    if (s.categories.some(function (c) { return c.name === name; })) { alert('类别名已存在'); return; }
+    TL.model.add('categories', { id: TL.model.uid(), name: name, color: color });
+    $('new-cat-name').value = '';
+  };
+
+  // ---------- 列表 ----------
+  UI.rebuildList = function () {
+    var s = TL.model.get();
+    var q = $('search').value.trim().toLowerCase();
+    var fcat = $('cat-filter').value;
+    var R = TL.render;
+
+    function matchText(t) { return !q || (t && t.toLowerCase().indexOf(q) >= 0); }
+
+    var eraList = $('era-list');
+    eraList.innerHTML = '';
+    s.eras.slice().sort(function (a, b) { return a.start - b.start; }).forEach(function (er) {
+      if (!matchText(er.name)) return;
+      var it = makeItem('era', er.id, er.color, 'bar', er.name, TL.date.format(er.start) + ' — ' + TL.date.format(er.end), null);
+      eraList.appendChild(it);
+    });
+
+    var perList = $('period-list');
+    perList.innerHTML = '';
+    s.periods.slice().sort(function (a, b) { return a.start - b.start; }).forEach(function (p) {
+      if (fcat && p.categoryId !== fcat) return;
+      if (!matchText(p.name + ' ' + (p.description || ''))) return;
+      var c = TL.model.itemColor(p);
+      perList.appendChild(makeItem('period', p.id, c, 'bar', p.name, TL.date.format(p.start) + ' — ' + TL.date.format(p.end), null));
+    });
+
+    var evList = $('event-list');
+    evList.innerHTML = '';
+    s.events.slice().sort(function (a, b) { return a.date - b.date; }).forEach(function (e) {
+      if (fcat && e.categoryId !== fcat) return;
+      if (!matchText(e.title + ' ' + (e.description || ''))) return;
+      var c = TL.model.itemColor(e);
+      evList.appendChild(makeItem('event', e.id, c, 'dot', e.title, TL.date.format(e.date), e.image));
+    });
+  };
+
+  function makeItem(type, id, color, shape, title, dateStr, thumb) {
+    var el = document.createElement('div');
+    el.className = 'item' + (Rsel(type, id) ? ' active' : '');
+    var dot = document.createElement('span');
+    dot.className = shape === 'dot' ? 'dot' : 'bar';
+    dot.style.background = color;
+    el.appendChild(dot);
+    if (thumb) {
+      var im = document.createElement('img'); im.className = 'thumb'; im.src = thumb;
+      el.appendChild(im);
+    }
+    var t = document.createElement('span'); t.className = 't'; t.textContent = title; t.title = title;
+    var d = document.createElement('span'); d.className = 'd'; d.textContent = dateStr;
+    el.appendChild(t); el.appendChild(d);
+    el.addEventListener('click', function () { UI.select(type, id); });
+    return el;
+  }
+
+  function Rsel(type, id) { return TL.render.selection && TL.render.selection.type === type && TL.render.selection.id === id; }
+
+  TL.ui = UI;
+})();
+
+</script>
+  <script>
+/* export.js — 导出 PNG / 保存与打开 JSON / 打印 */
+(function () {
+  'use strict';
+  var TL = window.TL = window.TL || {};
+  var E = {};
+
+  function slug(s) {
+    return String(s || 'timeline').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_').slice(0, 60) || 'timeline';
+  }
+  function download(name, href) {
+    var a = document.createElement('a');
+    a.download = name;
+    a.href = href;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  E.png = function () {
+    var b = TL.model.bounds();
+    var pad = (b.hi - b.lo) * 0.05 || 1;
+    var view = { t0: b.lo - pad, t1: b.hi + pad };
+
+    var s = TL.model.get();
+    var count = s.events.length + s.periods.length + s.eras.length;
+    var w = 1800;
+    var h = Math.max(640, Math.min(6000, 360 + s.events.length * 30 + s.periods.length * 36 + s.eras.length * 4));
+
+    var cv = document.createElement('canvas');
+    TL.render.renderToCanvas(cv, w, h, 2, view);
+    var title = s.title || '时间线';
+    download(slug(title) + '.png', cv.toDataURL('image/png'));
+  };
+
+  E.saveJSON = function () {
+    var data = {
+      app: 'timeline',
+      version: 1,
+      savedAt: new Date().toISOString(),
+      data: TL.model.get()
+    };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    download(slug(TL.model.get().title) + '.json', url);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  };
+
+  E.loadJSONFile = function (file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var parsed = JSON.parse(reader.result);
+        var d = parsed.data || parsed; // 兼容直接导出的模型
+        if (!d || typeof d !== 'object') throw new Error('格式错误');
+        d = E.normalize(d);
+        TL.model.setState(d);
+        TL.ui.select(null, null);
+        TL.render.fit();
+        TL.ui.refresh();
+      } catch (err) {
+        alert('打开失败：' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  E.normalize = function (d) {
+    var out = {
+      title: d.title || '我的时间线',
+      categories: Array.isArray(d.categories) ? d.categories : [],
+      eras: Array.isArray(d.eras) ? d.eras : [],
+      periods: Array.isArray(d.periods) ? d.periods : [],
+      events: Array.isArray(d.events) ? d.events : []
+    };
+    var seen = {};
+    ['categories', 'eras', 'periods', 'events'].forEach(function (k) {
+      out[k] = out[k].filter(function (it) {
+        if (!it || typeof it !== 'object') return false;
+        if (!it.id) it.id = TL.model.uid();
+        if (seen[it.id]) return false;
+        seen[it.id] = true;
+        return true;
+      });
+    });
+    // 事件补全日期字符串
+    out.events.forEach(function (e) {
+      if (e.date == null) e.date = 1900;
+      if (!e.dateStr) e.dateStr = TL.date.format(e.date);
+      if (e.endDate != null && !e.endDateStr) e.endDateStr = TL.date.format(e.endDate);
+    });
+    out.periods.forEach(function (p) {
+      if (p.start == null) p.start = 1900;
+      if (p.end == null) p.end = 2000;
+    });
+    out.eras.forEach(function (er) {
+      if (er.start == null) er.start = 1900;
+      if (er.end == null) er.end = 2000;
+    });
+    return out;
+  };
+
+  E.print = function () {
+    var b = TL.model.bounds();
+    var pad = (b.hi - b.lo) * 0.05 || 1;
+    var view = { t0: b.lo - pad, t1: b.hi + pad };
+    var s = TL.model.get();
+    var w = 2000;
+    var h = Math.max(800, Math.min(6000, 400 + s.events.length * 32 + s.periods.length * 38));
+
+    var cv = document.createElement('canvas');
+    TL.render.renderToCanvas(cv, w, h, 2, view);
+    var url = cv.toDataURL('image/png');
+
+    var win = window.open('', '_blank');
+    if (!win) { alert('浏览器拦截了弹窗，请允许弹出窗口后重试。'); return; }
+    win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + (s.title || '时间线') + '</title>' +
+      '<style>body{margin:0;padding:16px;font-family:-apple-system,"Segoe UI","PingFang SC",sans-serif;}' +
+      'h1{font-size:20px;margin:0 0 8px;}img{max-width:100%;height:auto;}@media print{img{width:100%;}}</style></head>' +
+      '<body><h1>' + (s.title || '时间线') + '</h1><img src="' + url + '" onload="setTimeout(function(){window.print()},300)"></body></html>');
+    win.document.close();
+  };
+
+  TL.export = E;
+})();
+
+</script>
+  <script>
+/* main.js — 启动：画布尺寸 / 载入数据 / 自动保存 / 快捷键 */
+(function () {
+  'use strict';
+  var TL = window.TL;
+  var canvas = document.getElementById('tl');
+  var wrap = document.getElementById('canvas-wrap');
+
+  TL.render.init(canvas);
+  TL.render.onImageLoad = function () { TL.render.draw(); };
+  TL.interaction.init(canvas);
+  TL.ui.init();
+
+  function resize() {
+    var r = wrap.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) TL.render.resize(r.width, r.height, window.devicePixelRatio || 1);
+  }
+  window.addEventListener('resize', resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(wrap);
+
+  // 载入：本地自动保存优先，否则示例
+  var loaded = false;
+  try {
+    var saved = localStorage.getItem('timeline-project');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      TL.model.setState(TL.export.normalize(parsed.data || parsed));
+      loaded = true;
+    }
+  } catch (e) { /* ignore */ }
+  if (!loaded) TL.model.setState(TL.sample());
+
+  resize();
+  TL.render.fit();
+  TL.ui.refresh();
+  TL.ui.select(null, null);
+
+  // 自动保存（防抖）
+  var saveTimer = null;
+  function autosave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try {
+        var data = { app: 'timeline', version: 1, savedAt: new Date().toISOString(), data: TL.model.get() };
+        localStorage.setItem('timeline-project', JSON.stringify(data));
+      } catch (e) { /* ignore */ }
+    }, 400);
+  }
+  TL.model.onChange(autosave);
+
+  // 快捷键
+  document.addEventListener('keydown', function (e) {
+    var tag = (document.activeElement && document.activeElement.tagName) || '';
+    var typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    var k = e.key.toLowerCase();
+
+    if ((e.ctrlKey || e.metaKey) && k === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) TL.model.redo(); else TL.model.undo();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); TL.model.redo(); return; }
+    if ((e.ctrlKey || e.metaKey) && k === 's') { e.preventDefault(); TL.export.saveJSON(); return; }
+
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && TL.ui.mode === 'edit' && TL.ui.id) {
+      e.preventDefault();
+      TL.ui.deleteSelected();
+    }
+    if (e.key === 'Escape' && !typing) TL.ui.select(null, null);
+  });
+})();
+
+</script>
+</body>
+</html>
