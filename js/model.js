@@ -58,6 +58,7 @@
 
   M.add = function (type, obj) {
     pushHistory();
+    if (!obj.id) obj.id = M.uid();
     state[key(type)].push(obj);
     emit();
     return obj;
